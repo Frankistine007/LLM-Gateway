@@ -1,0 +1,5 @@
+.env
+gatewayllmenv/
+__pycache__/
+*.pyc
+gateway.db
