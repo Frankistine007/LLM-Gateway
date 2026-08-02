@@ -11,7 +11,7 @@ class Client(Base):
     id = Column(Integer, primary_key=True, index=True)
     api_key = Column(String, unique=True, index=True, nullable=False)
     name = Column(String, nullable=False)
-
+    rate_limit = Column(Integer, nullable=False, server_default="10")
     logs = relationship("RequestLog", back_populates="client")
 
 
