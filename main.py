@@ -107,6 +107,7 @@ async def get_request_body(
         try:
             result = llm.invoke(lc_messages)
             log.response = result.content
+            log.tokens_used = (result.usage_metadata or {}).get("total_tokens")
             return PlainTextResponse(result.content)
         except Exception as exc:
             log.error_message = str(exc)
@@ -122,6 +123,8 @@ async def get_request_body(
         try:
             for chunk in llm.stream(lc_messages):
                 full_response += chunk.content
+                if chunk.usage_metadata:
+                    log.tokens_used = chunk.usage_metadata.get("total_tokens")
                 yield chunk.content
         except Exception as exc:
             log.error_message = str(exc)
