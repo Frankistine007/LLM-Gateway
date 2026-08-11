@@ -2,7 +2,7 @@ from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String, Tex
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
-from database import Base
+from app.database import Base
 
 
 class Client(Base):
@@ -12,6 +12,10 @@ class Client(Base):
     api_key = Column(String, unique=True, index=True, nullable=False)
     name = Column(String, nullable=False)
     rate_limit = Column(Integer, nullable=False, server_default="10")
+    token_limit = Column(Integer, nullable=False, server_default="100000")
+    bucket_requests = Column(Float, nullable=True)
+    bucket_tokens = Column(Float, nullable=True)
+    bucket_updated_at = Column(DateTime(timezone=True), nullable=True)
     logs = relationship("RequestLog", back_populates="client")
 
 
@@ -21,6 +25,8 @@ class RequestLog(Base):
     id = Column(Integer, primary_key=True, index=True)
     client_id = Column(Integer, ForeignKey("clients.id"), nullable=False)
     timestamp = Column(DateTime(timezone=True), server_default=func.now())
+    provider = Column(String, nullable=True)
+    model = Column(String, nullable=True)
     prompt = Column(Text, nullable=True)
     response = Column(Text, nullable=True)
     tokens_used = Column(Integer, nullable=True)

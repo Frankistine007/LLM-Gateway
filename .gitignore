@@ -3,4 +3,6 @@ gatewayllmenv/
 __pycache__/
 *.pyc
 gateway.db
+tests/test_gateway.db
 demo
+.claude
