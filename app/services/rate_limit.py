@@ -52,6 +52,41 @@ def _refill(client: models.Client, now: datetime):
     client.bucket_updated_at = now
 
 
+def rate_limit_headers(client: models.Client) -> dict[str, str]:
+    """OpenAI-style rate limit headers describing the client's current buckets.
+
+    Reports state as of the reservation, not settled usage: a streaming
+    response must send headers before its body, which is long before real
+    token usage is known, so both paths report the same (slightly
+    pessimistic) post-reserve numbers rather than disagreeing.
+    """
+    request_refill_rate = client.rate_limit / WINDOW_SECONDS
+    token_refill_rate = client.token_limit / WINDOW_SECONDS
+
+    requests_remaining = max(0.0, client.bucket_requests)
+    tokens_remaining = max(0.0, client.bucket_tokens)
+
+    return {
+        "X-RateLimit-Limit-Requests": str(client.rate_limit),
+        "X-RateLimit-Remaining-Requests": str(int(requests_remaining)),
+        "X-RateLimit-Reset-Requests": str(
+            _seconds_until(client.bucket_requests, client.rate_limit, request_refill_rate)
+        ),
+        "X-RateLimit-Limit-Tokens": str(client.token_limit),
+        "X-RateLimit-Remaining-Tokens": str(int(tokens_remaining)),
+        "X-RateLimit-Reset-Tokens": str(
+            _seconds_until(client.bucket_tokens, client.token_limit, token_refill_rate)
+        ),
+    }
+
+
+def _seconds_until(level: float, target: float, refill_rate: float) -> int:
+    """Whole seconds until a bucket refills from `level` back up to `target`."""
+    if level >= target:
+        return 0
+    return max(1, int((target - level) / refill_rate) + 1)
+
+
 def reserve_capacity(client: models.Client, db: Session, estimated_tokens: int):
     """Refills both buckets, then debits 1 request + the estimated token cost
     up front. Rejects with 429 before any provider call is made if either
@@ -70,7 +105,10 @@ def reserve_capacity(client: models.Client, db: Session, estimated_tokens: int):
             status_code=429,
             detail=f"Rate limit exceeded: {client.rate_limit} requests per "
             f"{WINDOW_SECONDS}s",
-            headers={"Retry-After": str(max(1, int(wait) + 1))},
+            headers={
+                **rate_limit_headers(client),
+                "Retry-After": str(max(1, int(wait) + 1)),
+            },
         )
 
     if client.bucket_tokens < estimated_tokens:
@@ -82,7 +120,10 @@ def reserve_capacity(client: models.Client, db: Session, estimated_tokens: int):
             status_code=429,
             detail=f"Token limit exceeded: {client.token_limit} tokens per "
             f"{WINDOW_SECONDS}s",
-            headers={"Retry-After": str(max(1, int(wait) + 1))},
+            headers={
+                **rate_limit_headers(client),
+                "Retry-After": str(max(1, int(wait) + 1)),
+            },
         )
 
     client.bucket_requests -= 1

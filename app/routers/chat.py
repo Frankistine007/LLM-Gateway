@@ -10,7 +10,12 @@ from app.dependencies import get_current_client, get_db
 from app.providers.errors import is_retryable
 from app.providers.registry import DEFAULT_MODEL, resolve_fallback, resolve_provider
 from app.providers.text import extract_text
-from app.services.rate_limit import estimate_tokens, reconcile_tokens, reserve_capacity
+from app.services.rate_limit import (
+    estimate_tokens,
+    rate_limit_headers,
+    reconcile_tokens,
+    reserve_capacity,
+)
 
 router = APIRouter(tags=["chat"])
 
@@ -29,6 +34,7 @@ async def create_chat_completion(
 
     estimated_tokens = estimate_tokens(messages, max_tokens)
     reserve_capacity(client, db, estimated_tokens)
+    headers = rate_limit_headers(client)
 
     provider_name, llm = resolve_provider(model)
 
@@ -43,17 +49,18 @@ async def create_chat_completion(
 
     if not stream:
         return _handle_non_streaming(
-            lc_messages, provider_name, llm, log, db, client, estimated_tokens
+            lc_messages, provider_name, llm, log, db, client, estimated_tokens, headers
         )
 
     return StreamingResponse(
         _token_stream(lc_messages, provider_name, llm, log, db, client, estimated_tokens),
         media_type="text/plain",
+        headers=headers,
     )
 
 
 def _handle_non_streaming(
-    lc_messages, provider_name, llm, log, db: Session, client, estimated_tokens: int
+    lc_messages, provider_name, llm, log, db: Session, client, estimated_tokens: int, headers
 ):
     start = time.perf_counter()
     try:
@@ -74,10 +81,10 @@ def _handle_non_streaming(
         text = extract_text(result.content)
         log.response = text
         log.tokens_used = (result.usage_metadata or {}).get("total_tokens")
-        return PlainTextResponse(text)
+        return PlainTextResponse(text, headers=headers)
     except Exception as exc:
         log.error_message = str(exc)
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        raise HTTPException(status_code=502, detail=str(exc), headers=headers) from exc
     finally:
         log.latency = time.perf_counter() - start
         db.add(log)

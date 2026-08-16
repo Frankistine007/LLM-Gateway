@@ -2,18 +2,19 @@ import pathlib
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app import models
 from app.config import settings
+from app.database import create_sqlite_engine
 from app.dependencies import get_db
 from app.main import app
 
 TEST_DB_PATH = pathlib.Path(__file__).parent / "test_gateway.db"
 TEST_DATABASE_URL = f"sqlite:///{TEST_DB_PATH}"
 
-engine = create_engine(TEST_DATABASE_URL, connect_args={"check_same_thread": False})
+# Same engine config as the app, so tests exercise the real locking behaviour.
+engine = create_sqlite_engine(TEST_DATABASE_URL, echo=False)
 TestSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
@@ -52,6 +53,13 @@ def db_session():
     session = TestSessionLocal()
     yield session
     session.close()
+
+
+@pytest.fixture()
+def session_factory():
+    """The raw session factory, for tests that need several sessions at once
+    (e.g. driving concurrent requests from multiple threads)."""
+    return TestSessionLocal
 
 
 @pytest.fixture()

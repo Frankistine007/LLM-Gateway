@@ -57,6 +57,10 @@ def test_bucket_initializes_full_on_first_request(client, api_key, db_session):
     log_client = _get_client(db_session, api_key)
     assert log_client.bucket_updated_at is None
 
+    # Every transaction now takes SQLite's write lock (BEGIN IMMEDIATE), so an
+    # idle open transaction here would block the request under test.
+    db_session.rollback()
+
     resp = client.post(
         "/v1/chat/completions",
         headers={"X-API-Key": api_key},
