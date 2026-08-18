@@ -17,7 +17,7 @@ def test_headers_present_on_successful_non_streaming(client, api_key, db_session
         "/v1/chat/completions",
         headers={"X-API-Key": api_key},
         json={
-            "model": "llama-3.1-8b-instant",
+            "model": "openai/gpt-oss-20b",
             "stream": False,
             "messages": [{"role": "user", "content": "Say 'pong' and nothing else."}],
         },
@@ -45,7 +45,7 @@ def test_headers_present_on_streaming(client, api_key):
         "/v1/chat/completions",
         headers={"X-API-Key": api_key},
         json={
-            "model": "llama-3.1-8b-instant",
+            "model": "openai/gpt-oss-20b",
             "stream": True,
             "messages": [{"role": "user", "content": "Say 'pong' and nothing else."}],
         },
@@ -70,7 +70,7 @@ def test_headers_present_on_429_rejection(client, api_key, db_session):
         "/v1/chat/completions",
         headers={"X-API-Key": api_key},
         json={
-            "model": "llama-3.1-8b-instant",
+            "model": "openai/gpt-oss-20b",
             "stream": False,
             "messages": [{"role": "user", "content": "hello"}],
         },

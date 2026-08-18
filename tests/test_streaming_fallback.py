@@ -28,7 +28,7 @@ def test_mid_stream_fallback_splices_in_backup_provider(
         "/v1/chat/completions",
         headers={"X-API-Key": api_key},
         json={
-            "model": "llama-3.1-8b-instant",
+            "model": "openai/gpt-oss-20b",
             "stream": True,
             "messages": [{"role": "user", "content": "hello"}],
         },

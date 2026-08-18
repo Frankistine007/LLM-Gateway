@@ -62,6 +62,20 @@ def session_factory():
     return TestSessionLocal
 
 
+@pytest.fixture(autouse=True)
+def _reset_provider_health():
+    """ProviderHealth is global state, shared across every client — unlike
+    per-client rows, a fresh api_key fixture doesn't isolate it. Without this,
+    a test that trips a provider's breaker leaks that into whichever test
+    runs next against the same test_gateway.db.
+    """
+    session = TestSessionLocal()
+    session.query(models.ProviderHealth).delete()
+    session.commit()
+    session.close()
+    yield
+
+
 @pytest.fixture()
 def api_key(client):
     """Creates a fresh throwaway client via POST /clients and returns its API key."""

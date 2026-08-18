@@ -20,7 +20,7 @@ def test_request_bucket_exhausted_returns_429(client, api_key, db_session):
         "/v1/chat/completions",
         headers={"X-API-Key": api_key},
         json={
-            "model": "llama-3.1-8b-instant",
+            "model": "openai/gpt-oss-20b",
             "stream": False,
             "messages": [{"role": "user", "content": "hello"}],
         },
@@ -43,7 +43,7 @@ def test_token_bucket_insufficient_returns_429(client, api_key, db_session):
         "/v1/chat/completions",
         headers={"X-API-Key": api_key},
         json={
-            "model": "llama-3.1-8b-instant",
+            "model": "openai/gpt-oss-20b",
             "stream": False,
             "messages": [{"role": "user", "content": "hello"}],
         },
@@ -65,7 +65,7 @@ def test_bucket_initializes_full_on_first_request(client, api_key, db_session):
         "/v1/chat/completions",
         headers={"X-API-Key": api_key},
         json={
-            "model": "llama-3.1-8b-instant",
+            "model": "openai/gpt-oss-20b",
             "stream": False,
             "messages": [{"role": "user", "content": "Say 'pong' and nothing else."}],
         },
@@ -85,7 +85,7 @@ def test_reconcile_refunds_overestimate_after_real_call(client, api_key, db_sess
         "/v1/chat/completions",
         headers={"X-API-Key": api_key},
         json={
-            "model": "llama-3.1-8b-instant",
+            "model": "openai/gpt-oss-20b",
             "stream": False,
             "messages": [{"role": "user", "content": "Say 'pong' and nothing else."}],
         },
@@ -123,7 +123,7 @@ def test_bucket_refills_over_time(client, api_key, db_session):
         "/v1/chat/completions",
         headers={"X-API-Key": api_key},
         json={
-            "model": "llama-3.1-8b-instant",
+            "model": "openai/gpt-oss-20b",
             "stream": False,
             "messages": [{"role": "user", "content": "Say 'pong' and nothing else."}],
         },

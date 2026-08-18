@@ -34,3 +34,15 @@ class RequestLog(Base):
     error_message = Column(Text, nullable=True)
 
     client = relationship("Client", back_populates="logs")
+
+
+class ProviderHealth(Base):
+    """Circuit breaker state, one row per provider (not per client — a
+    provider outage affects every client, so this is shared, global state)."""
+
+    __tablename__ = "provider_health"
+
+    provider = Column(String, primary_key=True)
+    consecutive_failures = Column(Integer, nullable=False, default=0)
+    state = Column(String, nullable=False, default="closed")  # closed | open | half_open
+    opened_at = Column(DateTime(timezone=True), nullable=True)

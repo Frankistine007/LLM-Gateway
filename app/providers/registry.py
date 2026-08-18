@@ -14,20 +14,31 @@ def build_gemini(model: str):
 
 # model name -> (provider name, factory). The factory defers construction so a
 # model is only instantiated when it is actually routed to.
+# Groq retired the llama-3.1/3.3 line (confirmed via GET /v1/models against
+# the real API on 2026-08-17); openai/gpt-oss-20b and -120b are the current
+# small/large pair.
 MODEL_REGISTRY = {
-    "llama-3.1-8b-instant": ("groq", build_groq),
-    "llama-3.3-70b-versatile": ("groq", build_groq),
+    "openai/gpt-oss-20b": ("groq", build_groq),
+    "openai/gpt-oss-120b": ("groq", build_groq),
     "gemini-flash-latest": ("gemini", build_gemini),
     "gemini-flash-lite-latest": ("gemini", build_gemini),
     "gemini-2.0-flash": ("gemini", build_gemini),
 }
 
-DEFAULT_MODEL = "llama-3.1-8b-instant"
+DEFAULT_MODEL = "openai/gpt-oss-20b"
+
+# Where classify_prompt()'s tier guess lands when the caller doesn't name a
+# model explicitly (or asks for "auto"). Both tiers stay on Groq for now —
+# crossing providers here would conflate routing with the fallback system.
+ROUTING_TIERS = {
+    "simple": "openai/gpt-oss-20b",
+    "complex": "openai/gpt-oss-120b",
+}
 
 # Where to send a request when its primary provider fails with a retryable error.
 FALLBACK_MODEL = {
     "groq": "gemini-flash-lite-latest",
-    "gemini": "llama-3.1-8b-instant",
+    "gemini": "openai/gpt-oss-20b",
 }
 
 
