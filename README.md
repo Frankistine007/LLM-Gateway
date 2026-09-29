@@ -46,7 +46,3 @@ uvicorn app.main:app --reload --port 8080
 
 Port 8000 is blocked on some Windows setups (`WinError 10013`); 8080 is used by convention here.
 
-## Known gaps
-
-See `CLAUDE.md` for the full list of deliberately deferred work (migrations, Redis-backed rate
-limiting, TPM limits, mid-stream fallback test coverage, etc.).
