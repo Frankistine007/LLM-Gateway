@@ -13,16 +13,16 @@ def _chunk(text, usage_metadata=None):
 def test_mid_stream_fallback_splices_in_backup_provider(
     monkeypatch, client, api_key, db_session
 ):
-    def fake_primary_stream(self, messages, **kwargs):
+    async def fake_primary_stream(self, messages, **kwargs):
         yield _chunk("Hello ", {"total_tokens": 5})
         yield _chunk("world", None)
         raise TimeoutError("simulated mid-stream timeout")
 
-    def fake_fallback_stream(self, messages, **kwargs):
+    async def fake_fallback_stream(self, messages, **kwargs):
         yield _chunk("fallback reply", {"total_tokens": 3})
 
-    monkeypatch.setattr(ChatGroq, "stream", fake_primary_stream)
-    monkeypatch.setattr(ChatGoogleGenerativeAI, "stream", fake_fallback_stream)
+    monkeypatch.setattr(ChatGroq, "astream", fake_primary_stream)
+    monkeypatch.setattr(ChatGoogleGenerativeAI, "astream", fake_fallback_stream)
 
     resp = client.post(
         "/v1/chat/completions",

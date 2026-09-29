@@ -28,7 +28,7 @@ def _ok_result(text="pong"):
 
 
 def _raise(status_code):
-    def _invoke(self, messages, **kwargs):
+    async def _invoke(self, messages, **kwargs):
         raise FakeProviderError(status_code)
 
     return _invoke
@@ -48,18 +48,24 @@ def test_breaker_trips_after_threshold_then_skips_primary(
     call_count = {"groq": 0}
     raise_503 = _raise(503)
 
-    def fake_groq_invoke(self, messages, **kwargs):
+    async def fake_groq_invoke(self, messages, **kwargs):
         call_count["groq"] += 1
-        return raise_503(self, messages, **kwargs)
+        return await raise_503(self, messages, **kwargs)
 
-    monkeypatch.setattr(ChatGroq, "invoke", fake_groq_invoke)
-    monkeypatch.setattr(
-        ChatGoogleGenerativeAI, "invoke", lambda self, messages, **kwargs: _ok_result()
-    )
+    monkeypatch.setattr(ChatGroq, "ainvoke", fake_groq_invoke)
 
-    for _ in range(FAILURE_THRESHOLD):
+    async def fake_gemini_invoke(self, messages, **kwargs):
+        return _ok_result()
+
+    monkeypatch.setattr(ChatGoogleGenerativeAI, "ainvoke", fake_gemini_invoke)
+
+    for attempt in range(FAILURE_THRESHOLD):
+        payload = {
+            **PAYLOAD,
+            "messages": [{"role": "user", "content": f"hi {attempt}"}],
+        }
         resp = client.post(
-            "/v1/chat/completions", headers={"X-API-Key": api_key}, json=PAYLOAD
+            "/v1/chat/completions", headers={"X-API-Key": api_key}, json=payload
         )
         assert resp.status_code == 200  # fallback covered it each time
 
@@ -71,17 +77,22 @@ def test_breaker_trips_after_threshold_then_skips_primary(
 
     # Breaker is now open: the next request should skip Groq entirely and go
     # straight to the fallback, without incrementing the primary call count.
+    payload = {
+        **PAYLOAD,
+        "messages": [{"role": "user", "content": "after breaker opened"}],
+    }
     resp = client.post(
-        "/v1/chat/completions", headers={"X-API-Key": api_key}, json=PAYLOAD
+        "/v1/chat/completions", headers={"X-API-Key": api_key}, json=payload
     )
     assert resp.status_code == 200
     assert call_count["groq"] == FAILURE_THRESHOLD
 
 
 def test_breaker_stays_closed_on_success(monkeypatch, client, api_key, db_session):
-    monkeypatch.setattr(
-        ChatGroq, "invoke", lambda self, messages, **kwargs: _ok_result()
-    )
+    async def fake_groq_ok(self, messages, **kwargs):
+        return _ok_result()
+
+    monkeypatch.setattr(ChatGroq, "ainvoke", fake_groq_ok)
 
     resp = client.post(
         "/v1/chat/completions", headers={"X-API-Key": api_key}, json=PAYLOAD
@@ -96,7 +107,7 @@ def test_breaker_stays_closed_on_success(monkeypatch, client, api_key, db_sessio
 def test_non_retryable_failure_does_not_count_toward_trip(
     monkeypatch, client, api_key, db_session
 ):
-    monkeypatch.setattr(ChatGroq, "invoke", _raise(400))
+    monkeypatch.setattr(ChatGroq, "ainvoke", _raise(400))
 
     resp = client.post(
         "/v1/chat/completions", headers={"X-API-Key": api_key}, json=PAYLOAD
@@ -122,9 +133,10 @@ def test_half_open_success_closes_the_circuit(monkeypatch, client, api_key, db_s
     )
     db_session.commit()
 
-    monkeypatch.setattr(
-        ChatGroq, "invoke", lambda self, messages, **kwargs: _ok_result()
-    )
+    async def fake_groq_ok(self, messages, **kwargs):
+        return _ok_result()
+
+    monkeypatch.setattr(ChatGroq, "ainvoke", fake_groq_ok)
 
     resp = client.post(
         "/v1/chat/completions", headers={"X-API-Key": api_key}, json=PAYLOAD
@@ -148,10 +160,12 @@ def test_half_open_failure_reopens_immediately(monkeypatch, client, api_key, db_
     )
     db_session.commit()
 
-    monkeypatch.setattr(ChatGroq, "invoke", _raise(503))
-    monkeypatch.setattr(
-        ChatGoogleGenerativeAI, "invoke", lambda self, messages, **kwargs: _ok_result()
-    )
+    monkeypatch.setattr(ChatGroq, "ainvoke", _raise(503))
+
+    async def fake_gemini_ok(self, messages, **kwargs):
+        return _ok_result()
+
+    monkeypatch.setattr(ChatGoogleGenerativeAI, "ainvoke", fake_gemini_ok)
 
     resp = client.post(
         "/v1/chat/completions", headers={"X-API-Key": api_key}, json=PAYLOAD
